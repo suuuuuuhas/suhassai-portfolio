@@ -87,30 +87,30 @@ type ResolvedPortraitTransitionRoute = PortraitTransitionRoute & {
 };
 
 const portraitTransitionRoutes: Record<string, PortraitTransitionRoute> = {
-  "center→up": { src: "/profile/portrait-center-a.png", row: 0, columns: [0, 0, 1] },
-  "center→up-right-soft": { src: "/profile/portrait-center-a.png", row: 0 },
-  "center→up-right": { src: "/profile/portrait-center-a.png", row: 0 },
-  "center→right": { src: "/profile/portrait-center-a.png", row: 3 },
-  "center→right-down-soft": { src: "/profile/portrait-center-b.png", row: 0 },
-  "center→down-right": { src: "/profile/portrait-center-b.png", row: 1 },
-  "center→down": { src: "/profile/portrait-center-b.png", row: 2 },
-  "center→down-left-soft": { src: "/profile/portrait-center-b.png", row: 0, flipX: true },
-  "center→down-left": { src: "/profile/portrait-center-b.png", row: 1, flipX: true },
-  "center→left": { src: "/profile/portrait-center-a.png", row: 3, flipX: true },
-  "center→left-up-soft": { src: "/profile/portrait-center-a.png", row: 0, flipX: true },
-  "center→up-left": { src: "/profile/portrait-center-a.png", row: 0, flipX: true },
-  "up→up-right-soft": { src: "/profile/portrait-ring-a.png", row: 0 },
-  "up-right-soft→up-right": { src: "/profile/portrait-ring-a.png", row: 1 },
-  "up-right→right": { src: "/profile/portrait-ring-a.png", row: 2 },
-  "right→right-down-soft": { src: "/profile/portrait-ring-a.png", row: 3 },
-  "right-down-soft→down-right": { src: "/profile/portrait-ring-b.png", row: 0 },
-  "down-right→down": { src: "/profile/portrait-ring-b.png", row: 1 },
-  "down→down-left-soft": { src: "/profile/portrait-ring-b.png", row: 2 },
-  "down-left-soft→down-left": { src: "/profile/portrait-ring-b.png", row: 3 },
-  "down-left→left": { src: "/profile/portrait-ring-c.png", row: 0 },
-  "left→left-up-soft": { src: "/profile/portrait-ring-c.png", row: 1 },
-  "left-up-soft→up-left": { src: "/profile/portrait-ring-c.png", row: 2 },
-  "up-left→up": { src: "/profile/portrait-ring-c.png", row: 3 },
+  "center→up": { src: "/profile/portrait-center-a.webp", row: 0, columns: [0, 0, 1] },
+  "center→up-right-soft": { src: "/profile/portrait-center-a.webp", row: 0 },
+  "center→up-right": { src: "/profile/portrait-center-a.webp", row: 0 },
+  "center→right": { src: "/profile/portrait-center-a.webp", row: 3 },
+  "center→right-down-soft": { src: "/profile/portrait-center-b.webp", row: 0 },
+  "center→down-right": { src: "/profile/portrait-center-b.webp", row: 1 },
+  "center→down": { src: "/profile/portrait-center-b.webp", row: 2 },
+  "center→down-left-soft": { src: "/profile/portrait-center-b.webp", row: 0, flipX: true },
+  "center→down-left": { src: "/profile/portrait-center-b.webp", row: 1, flipX: true },
+  "center→left": { src: "/profile/portrait-center-a.webp", row: 3, flipX: true },
+  "center→left-up-soft": { src: "/profile/portrait-center-a.webp", row: 0, flipX: true },
+  "center→up-left": { src: "/profile/portrait-center-a.webp", row: 0, flipX: true },
+  "up→up-right-soft": { src: "/profile/portrait-ring-a.webp", row: 0 },
+  "up-right-soft→up-right": { src: "/profile/portrait-ring-a.webp", row: 1 },
+  "up-right→right": { src: "/profile/portrait-ring-a.webp", row: 2 },
+  "right→right-down-soft": { src: "/profile/portrait-ring-a.webp", row: 3 },
+  "right-down-soft→down-right": { src: "/profile/portrait-ring-b.webp", row: 0 },
+  "down-right→down": { src: "/profile/portrait-ring-b.webp", row: 1 },
+  "down→down-left-soft": { src: "/profile/portrait-ring-b.webp", row: 2 },
+  "down-left-soft→down-left": { src: "/profile/portrait-ring-b.webp", row: 3 },
+  "down-left→left": { src: "/profile/portrait-ring-c.webp", row: 0 },
+  "left→left-up-soft": { src: "/profile/portrait-ring-c.webp", row: 1 },
+  "left-up-soft→up-left": { src: "/profile/portrait-ring-c.webp", row: 2 },
+  "up-left→up": { src: "/profile/portrait-ring-c.webp", row: 3 },
 };
 
 const portraitTransitionSources = [...new Set(Object.values(portraitTransitionRoutes).map((route) => route.src))];
@@ -167,7 +167,7 @@ function PortraitCell({ direction }: { direction: PortraitDirection }) {
     <span className="portrait-cell" aria-hidden="true">
       <img
         className="portrait-sheet"
-        src="/profile/portrait-directions.png"
+        src="/profile/portrait-directions.webp"
         alt=""
         draggable={false}
         style={{ transform: `translate3d(-${column * 25}%, -${row * 25}%, 0)` }}
@@ -228,6 +228,19 @@ function CursorPortrait({ onToggleTheme }: { onToggleTheme: () => void }) {
       const from = currentDirectionRef.current;
       if (from === nextDirection) return;
 
+      const fromIndex = portraitOrbit.indexOf(from as Exclude<PortraitDirection, "center">);
+      const toIndex = portraitOrbit.indexOf(nextDirection as Exclude<PortraitDirection, "center">);
+      if (from !== "center" && nextDirection !== "center" && fromIndex >= 0 && toIndex >= 0) {
+        const clockwiseDistance = (toIndex - fromIndex + portraitOrbit.length) % portraitOrbit.length;
+        const counterClockwiseDistance = (fromIndex - toIndex + portraitOrbit.length) % portraitOrbit.length;
+        if (Math.min(clockwiseDistance, counterClockwiseDistance) > 1) {
+          queuedDirectionRef.current = nextDirection;
+          nextDirection = clockwiseDistance <= counterClockwiseDistance
+            ? portraitOrbit[(fromIndex + 1) % portraitOrbit.length]
+            : portraitOrbit[(fromIndex - 1 + portraitOrbit.length) % portraitOrbit.length];
+        }
+      }
+
       clearTransitionTimers();
       animationRunningRef.current = true;
       const photoRoute = resolvePortraitTransition(from, nextDirection);
@@ -287,7 +300,7 @@ function CursorPortrait({ onToggleTheme }: { onToggleTheme: () => void }) {
   }, []);
 
   useEffect(() => {
-    preloadImage("/profile/portrait-directions.png");
+    preloadImage("/profile/portrait-directions.webp");
     portraitTransitionSources.forEach(preloadImage);
 
     let animationFrame = 0;
