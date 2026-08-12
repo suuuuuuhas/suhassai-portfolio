@@ -149,6 +149,18 @@ a:hover {
   overflow: hidden;
 }
 
+.portrait-cell-inner {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  transform-origin: center;
+}
+
+.portrait-cell-inner.is-flipped {
+  transform: scaleX(-1);
+}
+
 .portrait-sheet {
   position: absolute;
   top: 0;
