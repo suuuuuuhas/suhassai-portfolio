@@ -1,0 +1,689 @@
+import {
+  ArrowUpRight,
+  Globe,
+  InstagramLogo,
+  LinkedinLogo,
+  Moon,
+  Sun,
+  WhatsappLogo,
+} from "@phosphor-icons/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  digitalProjects,
+  educationItems,
+  experienceItems,
+  identity,
+  links,
+  proofSignals,
+  workItems,
+} from "./content";
+
+type Theme = "light" | "dark";
+type SectionId = "about" | "experience" | "work" | "education" | "links";
+type PortraitDirection =
+  | "center"
+  | "up"
+  | "up-right-soft"
+  | "up-right"
+  | "right"
+  | "right-down-soft"
+  | "down-right"
+  | "down"
+  | "down-left-soft"
+  | "down-left"
+  | "left"
+  | "left-up-soft"
+  | "up-left";
+
+const sectionTitles: Record<SectionId, string> = {
+  about: "About",
+  experience: "Experience",
+  work: "Selected work",
+  education: "Education",
+  links: "Links",
+};
+
+const portraitOrbit: Exclude<PortraitDirection, "center">[] = [
+  "up",
+  "up-right-soft",
+  "up-right",
+  "right",
+  "right-down-soft",
+  "down-right",
+  "down",
+  "down-left-soft",
+  "down-left",
+  "left",
+  "left-up-soft",
+  "up-left",
+];
+
+const portraitFrameIndex: Record<PortraitDirection, number> = {
+  center: 0,
+  up: 1,
+  "up-right-soft": 2,
+  "up-right": 3,
+  right: 4,
+  "right-down-soft": 5,
+  "down-right": 6,
+  down: 7,
+  "down-left-soft": 8,
+  "down-left": 9,
+  left: 10,
+  "left-up-soft": 11,
+  "up-left": 12,
+};
+
+const helpTopics = [
+  {
+    title: "I code with AI",
+    shortTitle: "Code with AI",
+    sprite: "/profile/help-code-sequence.png",
+    cellRatio: 3 / 4,
+    copy: "I turn rough ideas into working websites and useful tools by building with AI, not just talking about it.",
+  },
+  {
+    title: "I stay curious",
+    shortTitle: "Stay curious",
+    sprite: "/profile/help-curious-sequence.png",
+    cellRatio: 3 / 4,
+    copy: "Every business needs a first step upward. Mine is asking sharper questions, testing faster, and staying curious.",
+  },
+  {
+    title: "I decode viral patterns",
+    shortTitle: "Decode patterns",
+    sprite: "/profile/help-patterns-sequence.png",
+    cellRatio: 1,
+    copy: "I study hooks, retention, formats, and distribution to understand why social content travels—and how to repeat the signal.",
+  },
+] as const;
+
+const preloadImage = (src: string) => {
+  const image = new Image();
+  image.src = src;
+  void image.decode?.().catch(() => undefined);
+};
+
+function PortraitCell({ direction }: { direction: PortraitDirection }) {
+  const index = portraitFrameIndex[direction];
+  const column = index % 4;
+  const row = Math.floor(index / 4);
+
+  return (
+    <span className="portrait-cell" aria-hidden="true">
+      <img
+        className="portrait-sheet"
+        src="/profile/portrait-directions.png"
+        alt=""
+        draggable={false}
+        style={{ transform: `translate3d(-${column * 25}%, -${row * 25}%, 0)` }}
+      />
+    </span>
+  );
+}
+
+function CursorPortrait({ onToggleTheme }: { onToggleTheme: () => void }) {
+  const portraitRef = useRef<HTMLButtonElement>(null);
+  const currentDirectionRef = useRef<PortraitDirection>("center");
+  const animationRunningRef = useRef(false);
+  const queuedDirectionRef = useRef<PortraitDirection | null>(null);
+  const transitionTimersRef = useRef<number[]>([]);
+  const touchStartRef = useRef({ x: 0, y: 0, moved: false });
+  const [currentDirection, setCurrentDirection] = useState<PortraitDirection>("center");
+  const [transition, setTransition] = useState<{
+    from: PortraitDirection;
+    to: PortraitDirection;
+    alpha: number;
+  } | null>(null);
+  const [touchActive, setTouchActive] = useState(false);
+
+  const clearTransitionTimers = useCallback(() => {
+    transitionTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    transitionTimersRef.current = [];
+  }, []);
+
+  const animateTo = useCallback(
+    (nextDirection: PortraitDirection) => {
+      if (animationRunningRef.current) {
+        queuedDirectionRef.current = nextDirection;
+        return;
+      }
+
+      const from = currentDirectionRef.current;
+      if (from === nextDirection) return;
+
+      clearTransitionTimers();
+      animationRunningRef.current = true;
+      setTransition({ from, to: nextDirection, alpha: 0.25 });
+
+      const schedule = (delay: number, callback: () => void) => {
+        transitionTimersRef.current.push(window.setTimeout(callback, delay));
+      };
+
+      schedule(50, () => setTransition({ from, to: nextDirection, alpha: 0.5 }));
+      schedule(100, () => setTransition({ from, to: nextDirection, alpha: 0.75 }));
+      schedule(150, () => {
+        currentDirectionRef.current = nextDirection;
+        setCurrentDirection(nextDirection);
+        setTransition(null);
+        animationRunningRef.current = false;
+
+        const queued = queuedDirectionRef.current;
+        queuedDirectionRef.current = null;
+        if (queued && queued !== nextDirection) animateTo(queued);
+      });
+    },
+    [clearTransitionTimers],
+  );
+
+  const directionFromPoint = useCallback((clientX: number, clientY: number, allowCenter = true) => {
+    const portrait = portraitRef.current;
+    if (!portrait) return "center" as PortraitDirection;
+
+    const rect = portrait.getBoundingClientRect();
+    const deltaX = clientX - (rect.left + rect.width / 2);
+    const deltaY = clientY - (rect.top + rect.height / 2);
+    const distance = Math.hypot(deltaX, deltaY);
+
+    if (allowCenter && distance < rect.width / 2) return "center";
+
+    const angle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
+    const index = Math.round(((((angle + 90) % 360) + 360) % 360) / 30) % portraitOrbit.length;
+    return portraitOrbit[index];
+  }, []);
+
+  useEffect(() => {
+    preloadImage("/profile/portrait-directions.png");
+
+    let animationFrame = 0;
+    const handleMouseMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        animateTo(directionFromPoint(event.clientX, event.clientY));
+      });
+    };
+    const handleMouseLeave = () => animateTo("center");
+
+    window.addEventListener("pointermove", handleMouseMove, { passive: true });
+    document.documentElement.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      clearTransitionTimers();
+      window.removeEventListener("pointermove", handleMouseMove);
+      document.documentElement.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, [animateTo, clearTransitionTimers, directionFromPoint]);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    touchStartRef.current = { x: event.clientX, y: event.clientY, moved: false };
+    setTouchActive(true);
+    animateTo(directionFromPoint(event.clientX, event.clientY, false));
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const distance = Math.hypot(
+      event.clientX - touchStartRef.current.x,
+      event.clientY - touchStartRef.current.y,
+    );
+    if (distance > 8) touchStartRef.current.moved = true;
+    animateTo(directionFromPoint(event.clientX, event.clientY, false));
+  };
+
+  const endTouch = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setTouchActive(false);
+    animateTo("center");
+  };
+
+  const visibleFrom = transition?.from ?? currentDirection;
+  const visibleTo = transition?.to;
+
+  return (
+    <div className="portrait-interaction" data-touch-active={touchActive}>
+      <button
+        ref={portraitRef}
+        type="button"
+        className="avatar-wrap"
+        aria-label="Interactive portrait. Move around it to change my gaze; tap to switch theme."
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endTouch}
+        onPointerCancel={endTouch}
+        onClick={(event) => {
+          if (touchStartRef.current.moved) {
+            event.preventDefault();
+            touchStartRef.current.moved = false;
+            return;
+          }
+          onToggleTheme();
+        }}
+      >
+        <span className="portrait-layer" style={{ opacity: transition ? 1 - transition.alpha : 1 }}>
+          <PortraitCell direction={visibleFrom} />
+        </span>
+        {visibleTo ? (
+          <span className="portrait-layer" style={{ opacity: transition?.alpha ?? 1 }}>
+            <PortraitCell direction={visibleTo} />
+          </span>
+        ) : null}
+      </button>
+      <span className="touch-hint" aria-hidden="true">drag my portrait</span>
+    </div>
+  );
+}
+
+function AccordionSection({
+  id,
+  open,
+  onToggle,
+  children,
+}: {
+  id: SectionId;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      sectionRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    }, reduceMotion ? 0 : 110);
+    return () => window.clearTimeout(timer);
+  }, [open, reduceMotion]);
+
+  return (
+    <section ref={sectionRef} id={id === "work" ? "selected-work" : id} className="accordion">
+      <button
+        type="button"
+        className="accordion-trigger"
+        aria-expanded={open}
+        aria-controls={`${id}-panel`}
+        onClick={onToggle}
+      >
+        <span className="accordion-chevron" aria-hidden="true">&gt;</span>
+        <span>{sectionTitles[id]}</span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            id={`${id}-panel`}
+            className="accordion-panel"
+            initial={reduceMotion ? false : { height: 0 }}
+            animate={{ height: "auto" }}
+            exit={reduceMotion ? undefined : { height: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.1, ease: "easeOut" }}
+          >
+            <div className="accordion-content">{children}</div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function AboutContent() {
+  return (
+    <div className="copy-stack">
+      <p>{identity.intro}</p>
+      <p>I code with AI, stay curious, and decode the patterns behind content that spreads.</p>
+      <ul className="plain-list">
+        {proofSignals.map((signal) => <li key={signal}>{signal}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function ExperienceContent() {
+  return (
+    <div className="career-list">
+      {experienceItems.map((item) => (
+        <article key={`${item.title}-${item.org}`} className="career-item">
+          <span className="career-date">{item.period}</span>
+          <div>
+            <strong>{item.title}</strong>
+            <h3>
+              <a href={links.masettyAgro} target="_blank" rel="noreferrer">{item.org}</a>
+            </h3>
+            <p>{item.description}</p>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function WorkContent() {
+  return (
+    <div className="project-list">
+      {digitalProjects.map((project) => (
+        <a key={project.title} className="project-item" href={project.url} target="_blank" rel="noreferrer">
+          <span>
+            <strong>{project.title}</strong>
+            <small>{project.label} — {project.description}</small>
+          </span>
+          <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
+        </a>
+      ))}
+      {workItems.slice(0, 3).map((item) => (
+        <div key={item.title} className="project-item is-static">
+          <span>
+            <strong>{item.title}</strong>
+            <small>{item.category} — {item.description}</small>
+          </span>
+          <span className="project-year">{item.year}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EducationContent() {
+  return (
+    <div className="career-list">
+      {educationItems.map((item) => (
+        <article key={item.school} className="career-item">
+          <span className="career-date">{item.period}</span>
+          <div>
+            <strong>{item.school}</strong>
+            <h3>{item.board} · {item.grade}</h3>
+            <p>{item.note}</p>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function LinksContent() {
+  const socialLinks = [
+    { label: "LinkedIn", detail: "Professional profile", href: links.linkedin, icon: LinkedinLogo },
+    { label: "Instagram", detail: `@${links.instagramHandle}`, href: links.instagram, icon: InstagramLogo },
+    { label: "WhatsApp", detail: "+91 95505 62098", href: links.whatsapp, icon: WhatsappLogo },
+    { label: "Masetty Agro", detail: "Website and brand work", href: links.masettyAgro, icon: Globe },
+  ];
+
+  return (
+    <div className="project-list">
+      {socialLinks.map(({ label, detail, href, icon: Icon }) => (
+        <a key={label} className="project-item social-item" href={href} target="_blank" rel="noreferrer">
+          <Icon size={18} weight="bold" aria-hidden="true" />
+          <span>
+            <strong>{label}</strong>
+            <small>{detail}</small>
+          </span>
+          <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function HelpSprite({ topicIndex, frame }: { topicIndex: number | null; frame: number }) {
+  const topic = helpTopics[topicIndex ?? 1];
+  const visibleFrame = topicIndex === null ? 0 : frame;
+  const column = visibleFrame % 4;
+  const row = Math.floor(visibleFrame / 4);
+
+  if (topicIndex === 2 && frame === 7) {
+    return (
+      <div className="help-sprite-viewport" style={{ aspectRatio: 1 }}>
+        <img
+          className="help-final-image"
+          src="/profile/help-patterns-final.png"
+          alt="Suhassai on a phone call after decoding social media patterns"
+          draggable={false}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="help-sprite-viewport" style={{ aspectRatio: topic.cellRatio }}>
+      <img
+        key={topic.sprite}
+        className="help-sprite-sheet"
+        src={topic.sprite}
+        alt={topicIndex === null ? "Suhassai seated and ready to help" : helpTopics[topicIndex].title}
+        draggable={false}
+        style={{ transform: `translate3d(-${column * 25}%, -${row * 50}%, 0)` }}
+      />
+    </div>
+  );
+}
+
+function HelpView({ onBack }: { onBack: () => void }) {
+  const reduceMotion = useReducedMotion();
+  const [activeTopic, setActiveTopic] = useState<number | null>(null);
+  const [frame, setFrame] = useState(0);
+  const [touchMode, setTouchMode] = useState(false);
+  const timersRef = useRef<number[]>([]);
+  const swipeStartXRef = useRef(0);
+
+  const clearFrames = useCallback(() => {
+    timersRef.current.forEach((timer) => window.clearTimeout(timer));
+    timersRef.current = [];
+  }, []);
+
+  const playTopic = useCallback((index: number) => {
+    clearFrames();
+    setActiveTopic(index);
+    setFrame(0);
+    if (reduceMotion) {
+      setFrame(7);
+      return;
+    }
+    for (let nextFrame = 1; nextFrame < 8; nextFrame += 1) {
+      timersRef.current.push(window.setTimeout(() => setFrame(nextFrame), nextFrame * 70));
+    }
+  }, [clearFrames, reduceMotion]);
+
+  const resetTopic = useCallback(() => {
+    clearFrames();
+    setActiveTopic(null);
+    setFrame(0);
+  }, [clearFrames]);
+
+  useEffect(() => () => clearFrames(), [clearFrames]);
+
+  const moveTopic = (delta: number) => {
+    if (activeTopic === null) {
+      if (delta > 0) playTopic(0);
+      return;
+    }
+    const next = activeTopic + delta;
+    if (next < 0) resetTopic();
+    else if (next < helpTopics.length) playTopic(next);
+  };
+
+  return (
+    <motion.main
+      className="help-view"
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={reduceMotion ? undefined : { opacity: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeIn" }}
+    >
+      <button type="button" className="help-back" aria-label="Go back" onClick={onBack}>←</button>
+
+      <div className="help-content">
+        <div
+          className="help-image-wrap"
+          onPointerDown={(event) => {
+            if (event.pointerType === "touch" || event.pointerType === "pen") setTouchMode(true);
+            swipeStartXRef.current = event.clientX;
+          }}
+          onPointerUp={(event) => {
+            const distance = swipeStartXRef.current - event.clientX;
+            if (Math.abs(distance) < 40) return;
+            moveTopic(distance > 0 ? 1 : -1);
+          }}
+        >
+          <HelpSprite topicIndex={activeTopic} frame={frame} />
+        </div>
+
+        <h2 className="help-title">3 things I can help with</h2>
+
+        <div className="help-buttons" role="group" aria-label="Ways I can help">
+          {helpTopics.map((topic, index) => (
+            <button
+              key={topic.title}
+              type="button"
+              aria-pressed={activeTopic === index}
+              className={activeTopic === index ? "help-button is-active" : "help-button"}
+              onMouseEnter={() => { if (!touchMode) playTopic(index); }}
+              onMouseLeave={() => { if (!touchMode) resetTopic(); }}
+              onClick={() => playTopic(index)}
+            >
+              <span className="help-button-long">{topic.title}</span>
+              <span className="help-button-short">{topic.shortTitle}</span>
+            </button>
+          ))}
+        </div>
+
+        <p id="help-topic-panel" aria-live="polite" className={activeTopic === null ? "help-subtitle" : "help-subtitle is-visible"}>
+          {activeTopic === null ? "Choose one—or swipe the portrait on mobile." : helpTopics[activeTopic].copy}
+        </p>
+
+        <a className="help-contact" href={links.whatsapp} target="_blank" rel="noreferrer">
+          <WhatsappLogo size={18} weight="fill" aria-hidden="true" />
+          WhatsApp me
+        </a>
+      </div>
+    </motion.main>
+  );
+}
+
+function PortfolioPage({
+  theme,
+  onToggleTheme,
+  onOpenHelp,
+}: {
+  theme: Theme;
+  onToggleTheme: () => void;
+  onOpenHelp: () => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  const [openSection, setOpenSection] = useState<SectionId | null>(null);
+
+  return (
+    <motion.div
+      className="page"
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={reduceMotion ? undefined : { opacity: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeOut" }}
+    >
+      <a className="skip-link" href="#main-content">Skip to content</a>
+      <header className="hero">
+        <div className="header-top">
+          <CursorPortrait onToggleTheme={onToggleTheme} />
+          <button type="button" className="theme-toggle" aria-label="Toggle theme" onClick={onToggleTheme}>
+            {theme === "dark" ? <Sun size={17} weight="bold" /> : <Moon size={17} weight="bold" />}
+          </button>
+        </div>
+        <h1>Suhassai Masetty</h1>
+        <p className="tagline">
+          JEE 2026 aspirant and Head of Digital Marketing at{" "}
+          <a href={links.masettyAgro} target="_blank" rel="noreferrer">Masetty Agro Products</a>.
+          I code with AI, stay relentlessly curious, and study why ideas travel online.
+        </p>
+      </header>
+
+      <main id="main-content">
+        <AccordionSection id="about" open={openSection === "about"} onToggle={() => setOpenSection((value) => value === "about" ? null : "about")}>
+          <AboutContent />
+        </AccordionSection>
+        <AccordionSection id="experience" open={openSection === "experience"} onToggle={() => setOpenSection((value) => value === "experience" ? null : "experience")}>
+          <ExperienceContent />
+        </AccordionSection>
+        <AccordionSection id="work" open={openSection === "work"} onToggle={() => setOpenSection((value) => value === "work" ? null : "work")}>
+          <WorkContent />
+        </AccordionSection>
+        <AccordionSection id="education" open={openSection === "education"} onToggle={() => setOpenSection((value) => value === "education" ? null : "education")}>
+          <EducationContent />
+        </AccordionSection>
+        <AccordionSection id="links" open={openSection === "links"} onToggle={() => setOpenSection((value) => value === "links" ? null : "links")}>
+          <LinksContent />
+        </AccordionSection>
+      </main>
+
+      <button
+        type="button"
+        className="help-trigger"
+        onMouseEnter={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
+        onFocus={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
+        onClick={() => {
+          helpTopics.forEach((topic) => preloadImage(topic.sprite));
+          window.scrollTo({ top: 0, behavior: "auto" });
+          onOpenHelp();
+        }}
+      >
+        How can I help?
+      </button>
+
+      <footer>
+        <a href={links.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>
+        <a href={links.instagram} target="_blank" rel="noreferrer">Instagram</a>
+        <a href={links.whatsapp} target="_blank" rel="noreferrer">WhatsApp</a>
+      </footer>
+    </motion.div>
+  );
+}
+
+function initialTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  const saved = window.localStorage.getItem("theme");
+  if (saved === "light" || saved === "dark") return saved;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+export default function App() {
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemTheme = (event: MediaQueryListEvent) => {
+      if (!window.localStorage.getItem("theme")) setTheme(event.matches ? "dark" : "light");
+    };
+    media.addEventListener("change", handleSystemTheme);
+    return () => media.removeEventListener("change", handleSystemTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme((current) => {
+      const next = current === "dark" ? "light" : "dark";
+      const systemTheme: Theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      if (next === systemTheme) window.localStorage.removeItem("theme");
+      else window.localStorage.setItem("theme", next);
+      return next;
+    });
+  };
+
+  return (
+    <div className="site">
+      <AnimatePresence mode="wait" initial={false}>
+        {helpOpen ? (
+          <HelpView key="help" onBack={() => setHelpOpen(false)} />
+        ) : (
+          <PortfolioPage key="portfolio" theme={theme} onToggleTheme={toggleTheme} onOpenHelp={() => setHelpOpen(true)} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
