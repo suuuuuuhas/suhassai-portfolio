@@ -11,7 +11,7 @@ import {
   WhatsappLogo,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   digitalProjects,
   educationItems,
@@ -40,7 +40,11 @@ type PortraitDirection =
   | "left-up-soft"
   | "up-left";
 
-const greetings = ["hello", "namaste", "hola", "bonjour", "ciao", "こんにちは", "హలో"];
+const introGreetings = ["Hello", "Bonjour", "स्वागत है", "नमस्कार", "Ciao", "Olá", "おい", "Hallå", "Guten tag"];
+const introSessionKey = "suhassai-home-intro-2026-08-22";
+let introStartedThisLoad = false;
+
+type IntroPhase = "pending" | "greetings" | "identity" | "reveal" | "done";
 
 const sectionTitles: Record<SectionId, string> = {
   about: "About",
@@ -154,7 +158,7 @@ const helpTopics = [
     shortTitle: "Decode patterns",
     sprite: "/profile/help-patterns-sequence.png",
     cellRatio: 1,
-    copy: "I study hooks, retention, formats, and distribution to understand why social content travels—and how to repeat the signal.",
+    copy: "I study hooks, retention, formats, and distribution to understand why social content travels and how to repeat the signal.",
   },
 ] as const;
 
@@ -491,7 +495,7 @@ function WorkContent() {
         <a key={project.title} className="project-item" href={project.url} target="_blank" rel="noreferrer">
           <span>
             <strong>{project.title}</strong>
-            <small>{project.label} — {project.description}</small>
+            <small>{project.label} - {project.description}</small>
           </span>
           <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
         </a>
@@ -500,7 +504,7 @@ function WorkContent() {
         <div key={item.title} className="project-item is-static">
           <span>
             <strong>{item.title}</strong>
-            <small>{item.category} — {item.description}</small>
+            <small>{item.category} - {item.description}</small>
           </span>
           <span className="project-year">{item.year}</span>
         </div>
@@ -528,6 +532,7 @@ function EducationContent() {
 
 function LinksContent() {
   const socialLinks = [
+    { label: "GitHub", detail: "@suuuuuuhas", href: "https://github.com/suuuuuuhas", icon: GithubLogo },
     { label: "LinkedIn", detail: "Professional profile", href: links.linkedin, icon: LinkedinLogo },
     { label: "Instagram", detail: `@${links.instagramHandle}`, href: links.instagram, icon: InstagramLogo },
     { label: "WhatsApp", detail: "+91 95505 62098", href: links.whatsapp, icon: WhatsappLogo },
@@ -673,7 +678,7 @@ function HelpView({ onBack }: { onBack: () => void }) {
         </div>
 
         <p id="help-topic-panel" aria-live="polite" className={activeTopic === null ? "help-subtitle" : "help-subtitle is-visible"}>
-          {activeTopic === null ? "Choose one—or swipe the portrait on mobile." : helpTopics[activeTopic].copy}
+          {activeTopic === null ? "Choose one or swipe the portrait on mobile." : helpTopics[activeTopic].copy}
         </p>
 
         <a className="help-contact" href={links.whatsapp} target="_blank" rel="noreferrer">
@@ -685,28 +690,107 @@ function HelpView({ onBack }: { onBack: () => void }) {
   );
 }
 
-function RotatingGreeting() {
+function PortfolioIntro() {
   const reduceMotion = useReducedMotion();
-  const [index, setIndex] = useState(0);
+  const initializedRef = useRef(false);
+  const [phase, setPhase] = useState<IntroPhase>(() => {
+    if (introStartedThisLoad) return "done";
+    try {
+      return window.sessionStorage.getItem(introSessionKey) === "true" ? "done" : "pending";
+    } catch {
+      return "pending";
+    }
+  });
+  const [greetingIndex, setGreetingIndex] = useState(0);
 
-  useEffect(() => {
-    if (reduceMotion) return;
-    const timer = window.setInterval(() => setIndex((current) => (current + 1) % greetings.length), 1800);
-    return () => window.clearInterval(timer);
+  useLayoutEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    if (reduceMotion) {
+      setPhase("done");
+      return;
+    }
+
+    let alreadySeen = false;
+    try {
+      alreadySeen = window.sessionStorage.getItem(introSessionKey) === "true";
+    } catch {
+      alreadySeen = false;
+    }
+
+    if (introStartedThisLoad || alreadySeen) {
+      setPhase("done");
+      return;
+    }
+
+    introStartedThisLoad = true;
+    try {
+      window.sessionStorage.setItem(introSessionKey, "true");
+    } catch {
+      // The intro still plays when storage is unavailable.
+    }
+    setPhase("greetings");
   }, [reduceMotion]);
 
+  useEffect(() => {
+    if (phase !== "greetings") return;
+
+    const timers = introGreetings.slice(1).map((_, index) => (
+      window.setTimeout(() => setGreetingIndex(index + 1), (index + 1) * 180)
+    ));
+    const greetingDuration = introGreetings.length * 180;
+    timers.push(window.setTimeout(() => setPhase("identity"), greetingDuration));
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "identity") return;
+    const timer = window.setTimeout(() => setPhase("reveal"), 600);
+    return () => window.clearTimeout(timer);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === "done") return;
+    const previousDocumentOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.documentElement.style.overflow = previousDocumentOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, [phase]);
+
   return (
-    <p className="greeting" aria-live="polite">
-      <motion.span
-        key={greetings[index]}
-        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
-      >
-        {greetings[index]}
-      </motion.span>
-      <span>, I’m</span>
-    </p>
+    <AnimatePresence initial={false} onExitComplete={() => setPhase("done")}>
+      {phase !== "reveal" && phase !== "done" ? (
+        <motion.div
+          key="portfolio-intro"
+          className="portfolio-intro"
+          aria-hidden="true"
+          initial={false}
+          exit={{ y: "-101%" }}
+          transition={{ delay: 0.78, duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
+        >
+          {phase === "greetings" ? (
+            <p className="intro-greeting">
+              <span className="intro-dot" />
+              <span>{introGreetings[greetingIndex]}</span>
+            </p>
+          ) : null}
+          {phase === "identity" ? (
+            <div className="intro-identity">
+              <span>I’m</span>
+              <span className="intro-portrait"><PortraitCell direction="center" /></span>
+              <strong>Suhassai</strong>
+            </div>
+          ) : null}
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
@@ -722,63 +806,85 @@ function PortfolioPage({
   const reduceMotion = useReducedMotion();
   const [projectView, setProjectView] = useState<"list" | "showcase">("list");
   const [projectSource, setProjectSource] = useState<"github" | "client">("github");
+  const [craftView, setCraftView] = useState<"list" | "showcase">("list");
   const shownProjects = projectSource === "github" ? githubProjects : digitalProjects;
 
   return (
     <motion.div
       className="page"
-      initial={reduceMotion ? false : { opacity: 0 }}
+      initial={false}
       animate={{ opacity: 1 }}
       exit={reduceMotion ? undefined : { opacity: 0 }}
       transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeOut" }}
     >
+      <PortfolioIntro />
       <a className="skip-link" href="#main-content">Skip to content</a>
       <nav className="site-nav" aria-label="Primary navigation">
         <a href="#home">home</a>
         <a href="#projects">work</a>
         <a href="#crafts">extras</a>
         <a href="#contact">contact</a>
-        <button type="button" className="theme-toggle" aria-label="Toggle theme" onClick={onToggleTheme}>
-          {theme === "dark" ? <Sun size={16} weight="bold" /> : <Moon size={16} weight="bold" />}
-        </button>
+        <div className="nav-actions">
+          <a href="https://github.com/suuuuuuhas" target="_blank" rel="noreferrer" aria-label="GitHub">
+            <GithubLogo size={16} weight="fill" />
+          </a>
+          <a href={links.instagram} target="_blank" rel="noreferrer" aria-label="Instagram">
+            <InstagramLogo size={16} weight="bold" />
+          </a>
+          <button type="button" className="theme-toggle" aria-label="Toggle theme" onClick={onToggleTheme}>
+            {theme === "dark" ? <Sun size={15} weight="bold" /> : <Moon size={15} weight="fill" />}
+          </button>
+        </div>
       </nav>
 
       <header id="home" className="hero">
-        <div className="profile-center">
+        <div className="profile-row">
           <CursorPortrait onToggleTheme={onToggleTheme} />
-          <RotatingGreeting />
-          <h1>Suhassai Masetty</h1>
-          <p className="role">AI-assisted builder and digital marketer</p>
+          <div className="profile-copy">
+            <h1>Suhassai Masetty</h1>
+            <p className="role">AI-assisted builder and digital marketer</p>
+          </div>
         </div>
-        <p className="tagline">
-          I build websites, content experiments, and digital systems for ideas that deserve attention. Currently shaping the web presence of{" "}
-          <a href={links.masettyAgro} target="_blank" rel="noreferrer">Masetty Agro Products</a>.
-        </p>
-        <div className="hero-actions">
-          <a className="primary-action" href={links.whatsapp} target="_blank" rel="noreferrer">Say hello <ArrowUpRight size={15} weight="bold" /></a>
-          <button
-            type="button"
-            className="quiet-action"
-            onMouseEnter={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
-            onFocus={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
-            onClick={() => {
-              helpTopics.forEach((topic) => preloadImage(topic.sprite));
-              window.scrollTo({ top: 0, behavior: "auto" });
-              onOpenHelp();
-            }}
-          >
-            How can I help?
-          </button>
+        <div className="hero-copy">
+          <p>I build websites, content experiments, and digital systems that turn rough ideas into useful, polished experiences.</p>
+          <p>
+            I lead digital work at <a href={links.masettyAgro} target="_blank" rel="noreferrer">Masetty Agro Products</a>, where I shape branding, content, and the company’s web presence.
+          </p>
+        </div>
+        <div className="activity-panel">
+          <a className="contribution-graph" href="https://github.com/suuuuuuhas" target="_blank" rel="noreferrer">
+            <img
+              src="https://ghchart.rshah.org/777777/suuuuuuhas"
+              alt="Suhassai's public GitHub contribution activity"
+              width={800}
+              height={128}
+            />
+          </a>
+          <div className="activity-cta">
+            <p>Interested in working together? Explore my <a href="https://github.com/suuuuuuhas" target="_blank" rel="noreferrer">GitHub <ArrowUpRight size={13} weight="bold" /></a></p>
+            <div className="hero-actions">
+              <button
+                type="button"
+                className="primary-action"
+                onMouseEnter={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
+                onFocus={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
+                onClick={() => {
+                  helpTopics.forEach((topic) => preloadImage(topic.sprite));
+                  window.scrollTo({ top: 0, behavior: "auto" });
+                  onOpenHelp();
+                }}
+              >
+                How can I help?
+              </button>
+              <a className="quiet-action" href={links.whatsapp} target="_blank" rel="noreferrer">
+                <WhatsappLogo size={15} weight="bold" /> Send a message
+              </a>
+            </div>
+          </div>
         </div>
       </header>
 
       <main id="main-content">
-        <section className="proof-strip" aria-label="Current focus">
-          <p>Building with AI</p>
-          <p>Digital at Masetty Agro</p>
-          <p>Studying why ideas travel</p>
-        </section>
-
         <section id="projects" className="portfolio-section">
           <div className="section-heading">
             <h2>projects.</h2>
@@ -786,8 +892,8 @@ function PortfolioPage({
               <label className="source-select">
                 <span className="sr-only">Project source</span>
                 <select value={projectSource} onChange={(event) => setProjectSource(event.target.value as "github" | "client")}>
-                  <option value="github">GitHub builds</option>
-                  <option value="client">Client and content</option>
+                  <option value="github">Personal</option>
+                  <option value="client">Client work</option>
                 </select>
               </label>
               <div className="view-switcher" role="group" aria-label="Project view">
@@ -851,19 +957,45 @@ function PortfolioPage({
         </section>
 
         <section id="crafts" className="portfolio-section">
-          <div className="section-heading"><h2>creative archive.</h2></div>
-          <div className="archive-grid">
-            {workItems.map((item) => (
-              <article key={item.title} className="archive-item">
-                <img src={item.image} alt="" />
-                <div>
-                  <span>{item.category}</span>
-                  <strong>{item.title}</strong>
-                  <small>{item.year}</small>
-                </div>
-              </article>
-            ))}
+          <div className="section-heading">
+            <h2>crafts.</h2>
+            <div className="view-switcher" role="group" aria-label="Craft view">
+              <button type="button" aria-pressed={craftView === "list"} onClick={() => setCraftView("list")}>
+                <List size={17} weight="bold" aria-hidden="true" />
+                <span className="sr-only">Craft list view</span>
+              </button>
+              <button type="button" aria-pressed={craftView === "showcase"} onClick={() => setCraftView("showcase")}>
+                <SquaresFour size={17} weight="bold" aria-hidden="true" />
+                <span className="sr-only">Craft showcase view</span>
+              </button>
+            </div>
           </div>
+          {craftView === "list" ? (
+            <div className="craft-records">
+              {workItems.map((item) => (
+                <article key={item.title} className="craft-record">
+                  <span>
+                    <strong>{item.title}</strong>
+                    <small>{item.description}</small>
+                  </span>
+                  <em>{item.year}</em>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="archive-grid">
+              {workItems.map((item) => (
+                <article key={item.title} className="archive-item">
+                  <img src={item.image} alt="" />
+                  <div>
+                    <span>{item.category}</span>
+                    <strong>{item.title}</strong>
+                    <small>{item.year}</small>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="portfolio-section">
@@ -883,11 +1015,8 @@ function PortfolioPage({
       </main>
 
       <footer>
+        <span>Last updated Aug 22, 2026</span>
         <span>© 2026 Suhassai Masetty</span>
-        <a href={links.linkedin} target="_blank" rel="noreferrer"><LinkedinLogo size={16} weight="bold" aria-label="LinkedIn" /></a>
-        <a href={links.instagram} target="_blank" rel="noreferrer"><InstagramLogo size={16} weight="bold" aria-label="Instagram" /></a>
-        <a href={links.whatsapp} target="_blank" rel="noreferrer"><WhatsappLogo size={16} weight="bold" aria-label="WhatsApp" /></a>
-        <a href="https://github.com/suuuuuuhas" target="_blank" rel="noreferrer"><GithubLogo size={16} weight="bold" aria-label="GitHub" /></a>
       </footer>
     </motion.div>
   );

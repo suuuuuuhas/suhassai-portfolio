@@ -128,7 +128,7 @@ export const githubProjects = [
     label: "This website",
     url: "https://github.com/suuuuuuhas/suhassai-portfolio",
     description: "An interactive React portfolio with cursor-reactive portrait moments.",
-    isPrivate: true,
+    isPrivate: false,
   },
 ];
 
