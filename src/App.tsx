@@ -28,17 +28,15 @@ type SectionId = "about" | "experience" | "work" | "education" | "links";
 type PortraitDirection =
   | "center"
   | "up"
-  | "up-right-soft"
   | "up-right"
   | "right"
-  | "right-down-soft"
   | "down-right"
   | "down"
-  | "down-left-soft"
   | "down-left"
   | "left"
-  | "left-up-soft"
   | "up-left";
+
+type PortraitPose = PortraitDirection | "up-right-soft" | "right-down-soft" | "down-left-soft" | "left-up-soft";
 
 const introGreetings = ["Hello", "Bonjour", "स्वागत है", "नमस्कार", "Ciao", "Olá", "おい", "Hallå", "Guten tag"];
 const introSessionKey = "suhassai-home-intro-2026-08-22";
@@ -54,22 +52,7 @@ const sectionTitles: Record<SectionId, string> = {
   links: "Links",
 };
 
-const portraitOrbit: Exclude<PortraitDirection, "center">[] = [
-  "up",
-  "up-right-soft",
-  "up-right",
-  "right",
-  "right-down-soft",
-  "down-right",
-  "down",
-  "down-left-soft",
-  "down-left",
-  "left",
-  "left-up-soft",
-  "up-left",
-];
-
-const portraitFrameIndex: Record<PortraitDirection, number> = {
+const portraitPoseIndex: Record<PortraitPose, number> = {
   center: 0,
   up: 1,
   "up-right-soft": 2,
@@ -85,6 +68,20 @@ const portraitFrameIndex: Record<PortraitDirection, number> = {
   "up-left": 12,
 };
 
+const portraitSheetSrc = "/profile/portrait-directions.webp";
+
+type PortraitFrame = {
+  src: string;
+  column: number;
+  row: number;
+  flipX?: boolean;
+};
+
+function portraitCellOf(pose: PortraitPose): PortraitFrame {
+  const index = portraitPoseIndex[pose];
+  return { src: portraitSheetSrc, column: index % 4, row: Math.floor(index / 4) };
+}
+
 type PortraitTransitionRoute = {
   src: string;
   row: number;
@@ -98,44 +95,47 @@ type ResolvedPortraitTransitionRoute = PortraitTransitionRoute & {
 
 const portraitTransitionRoutes: Record<string, PortraitTransitionRoute> = {
   "center→up": { src: "/profile/portrait-center-a.webp", row: 0, columns: [0, 0, 1] },
-  "center→up-right-soft": { src: "/profile/portrait-center-a.webp", row: 0 },
   "center→up-right": { src: "/profile/portrait-center-a.webp", row: 0 },
   "center→right": { src: "/profile/portrait-center-a.webp", row: 3 },
-  "center→right-down-soft": { src: "/profile/portrait-center-b.webp", row: 0 },
   "center→down-right": { src: "/profile/portrait-center-b.webp", row: 1 },
   "center→down": { src: "/profile/portrait-center-b.webp", row: 2 },
-  "center→down-left-soft": { src: "/profile/portrait-center-b.webp", row: 0, flipX: true },
   "center→down-left": { src: "/profile/portrait-center-b.webp", row: 1, flipX: true },
   "center→left": { src: "/profile/portrait-center-a.webp", row: 3, flipX: true },
-  "center→left-up-soft": { src: "/profile/portrait-center-a.webp", row: 0, flipX: true },
   "center→up-left": { src: "/profile/portrait-center-a.webp", row: 0, flipX: true },
-  "up→up-right-soft": { src: "/profile/portrait-ring-a.webp", row: 0 },
-  "up-right-soft→up-right": { src: "/profile/portrait-ring-a.webp", row: 1 },
   "up-right→right": { src: "/profile/portrait-ring-a.webp", row: 2 },
-  "right→right-down-soft": { src: "/profile/portrait-ring-a.webp", row: 3 },
-  "right-down-soft→down-right": { src: "/profile/portrait-ring-b.webp", row: 0 },
   "down-right→down": { src: "/profile/portrait-ring-b.webp", row: 1 },
-  "down→down-left-soft": { src: "/profile/portrait-ring-b.webp", row: 2 },
-  "down-left-soft→down-left": { src: "/profile/portrait-ring-b.webp", row: 3 },
   "down-left→left": { src: "/profile/portrait-ring-c.webp", row: 0 },
-  "left→left-up-soft": { src: "/profile/portrait-ring-c.webp", row: 1 },
-  "left-up-soft→up-left": { src: "/profile/portrait-ring-c.webp", row: 2 },
   "up-left→up": { src: "/profile/portrait-ring-c.webp", row: 3 },
+};
+
+const portraitSoftBridges: Record<string, PortraitPose> = {
+  "up|up-right": "up-right-soft",
+  "right|down-right": "right-down-soft",
+  "down|down-left": "down-left-soft",
+  "left|up-left": "left-up-soft",
 };
 
 const portraitTransitionSources = [...new Set(Object.values(portraitTransitionRoutes).map((route) => route.src))];
 
-function resolvePortraitTransition(
+function framesOfRoute(route: ResolvedPortraitTransitionRoute): PortraitFrame[] {
+  return route.columns.map((column) => ({ src: route.src, column, row: route.row, flipX: route.flipX }));
+}
+
+function resolvePortraitFrames(
   from: PortraitDirection,
   to: PortraitDirection,
-): ResolvedPortraitTransitionRoute | null {
+): PortraitFrame[] | null {
   const direct = portraitTransitionRoutes[`${from}→${to}`];
-  if (direct) return { ...direct, columns: direct.columns ?? [0, 1, 2] };
+  if (direct) return framesOfRoute({ ...direct, columns: direct.columns ?? [0, 1, 2] });
 
   const reverse = portraitTransitionRoutes[`${to}→${from}`];
-  if (!reverse) return null;
-  const columns = reverse.columns ?? [0, 1, 2];
-  return { ...reverse, columns: [columns[2], columns[1], columns[0]] };
+  if (reverse) return framesOfRoute({ ...reverse, columns: [2, 1, 0] });
+
+  const bridge =
+    portraitSoftBridges[`${from}|${to}`] ?? portraitSoftBridges[`${to}|${from}`];
+  if (bridge) return [portraitCellOf(from), portraitCellOf(bridge), portraitCellOf(to)];
+
+  return null;
 }
 
 const helpTopics = [
@@ -168,59 +168,35 @@ const preloadImage = (src: string) => {
   void image.decode?.().catch(() => undefined);
 };
 
-function PortraitCell({ direction }: { direction: PortraitDirection }) {
-  const index = portraitFrameIndex[direction];
-  const column = index % 4;
-  const row = Math.floor(index / 4);
-
+function PortraitFrameView({ frame }: { frame: PortraitFrame }) {
   return (
     <span className="portrait-cell" aria-hidden="true">
-      <img
-        className="portrait-sheet"
-        src="/profile/portrait-directions.webp"
-        alt=""
-        draggable={false}
-        style={{ transform: `translate3d(-${column * 25}%, -${row * 25}%, 0)` }}
-      />
-    </span>
-  );
-}
-
-function PortraitTransitionCell({
-  route,
-  column,
-}: {
-  route: ResolvedPortraitTransitionRoute;
-  column: number;
-}) {
-  return (
-    <span className="portrait-cell" aria-hidden="true">
-      <span className={route.flipX ? "portrait-cell-inner is-flipped" : "portrait-cell-inner"}>
+      <span className={frame.flipX ? "portrait-cell-inner is-flipped" : "portrait-cell-inner"}>
         <img
           className="portrait-sheet"
-          src={route.src}
+          src={frame.src}
           alt=""
           draggable={false}
-          style={{ transform: `translate3d(-${column * 25}%, -${route.row * 25}%, 0)` }}
+          style={{ transform: `translate3d(-${frame.column * 25}%, -${frame.row * 25}%, 0)` }}
         />
       </span>
     </span>
   );
 }
 
+function PortraitCell({ direction }: { direction: PortraitDirection }) {
+  return <PortraitFrameView frame={portraitCellOf(direction)} />;
+}
+
 function CursorPortrait({ onToggleTheme }: { onToggleTheme: () => void }) {
   const portraitRef = useRef<HTMLButtonElement>(null);
   const currentDirectionRef = useRef<PortraitDirection>("center");
-  const animationRunningRef = useRef(false);
-  const queuedDirectionRef = useRef<PortraitDirection | null>(null);
+  const turningRef = useRef(false);
   const transitionTimersRef = useRef<number[]>([]);
   const touchStartRef = useRef({ x: 0, y: 0, moved: false });
   const [currentDirection, setCurrentDirection] = useState<PortraitDirection>("center");
-  const [transition, setTransition] = useState<
-    | { kind: "photo"; route: ResolvedPortraitTransitionRoute; column: number }
-    | { kind: "blend"; from: PortraitDirection; to: PortraitDirection; alpha: number }
-    | null
-  >(null);
+  const [turnFrames, setTurnFrames] = useState<PortraitFrame[] | null>(null);
+  const [turnStep, setTurnStep] = useState(0);
   const [touchActive, setTouchActive] = useState(false);
 
   const clearTransitionTimers = useCallback(() => {
@@ -230,64 +206,34 @@ function CursorPortrait({ onToggleTheme }: { onToggleTheme: () => void }) {
 
   const animateTo = useCallback(
     (nextDirection: PortraitDirection) => {
-      if (animationRunningRef.current) {
-        queuedDirectionRef.current = nextDirection;
-        return;
-      }
+      if (turningRef.current) return;
 
       const from = currentDirectionRef.current;
       if (from === nextDirection) return;
 
-      const fromIndex = portraitOrbit.indexOf(from as Exclude<PortraitDirection, "center">);
-      const toIndex = portraitOrbit.indexOf(nextDirection as Exclude<PortraitDirection, "center">);
-      if (from !== "center" && nextDirection !== "center" && fromIndex >= 0 && toIndex >= 0) {
-        const clockwiseDistance = (toIndex - fromIndex + portraitOrbit.length) % portraitOrbit.length;
-        const counterClockwiseDistance = (fromIndex - toIndex + portraitOrbit.length) % portraitOrbit.length;
-        if (Math.min(clockwiseDistance, counterClockwiseDistance) > 1) {
-          queuedDirectionRef.current = nextDirection;
-          nextDirection = clockwiseDistance <= counterClockwiseDistance
-            ? portraitOrbit[(fromIndex + 1) % portraitOrbit.length]
-            : portraitOrbit[(fromIndex - 1 + portraitOrbit.length) % portraitOrbit.length];
-        }
+      const frames = resolvePortraitFrames(from, nextDirection);
+      if (!frames) {
+        currentDirectionRef.current = nextDirection;
+        setCurrentDirection(nextDirection);
+        return;
       }
 
       clearTransitionTimers();
-      animationRunningRef.current = true;
-      const photoRoute = resolvePortraitTransition(from, nextDirection);
-
-      if (photoRoute) {
-        setTransition({ kind: "photo", route: photoRoute, column: photoRoute.columns[0] });
-      } else {
-        setTransition({ kind: "blend", from, to: nextDirection, alpha: 0.25 });
-      }
+      turningRef.current = true;
+      setTurnFrames(frames);
+      setTurnStep(0);
 
       const schedule = (delay: number, callback: () => void) => {
         transitionTimersRef.current.push(window.setTimeout(callback, delay));
       };
 
-      schedule(50, () => {
-        setTransition(
-          photoRoute
-            ? { kind: "photo", route: photoRoute, column: photoRoute.columns[1] }
-            : { kind: "blend", from, to: nextDirection, alpha: 0.5 },
-        );
-      });
-      schedule(100, () => {
-        setTransition(
-          photoRoute
-            ? { kind: "photo", route: photoRoute, column: photoRoute.columns[2] }
-            : { kind: "blend", from, to: nextDirection, alpha: 0.75 },
-        );
-      });
+      schedule(50, () => setTurnStep(1));
+      schedule(100, () => setTurnStep(2));
       schedule(150, () => {
+        turningRef.current = false;
         currentDirectionRef.current = nextDirection;
         setCurrentDirection(nextDirection);
-        setTransition(null);
-        animationRunningRef.current = false;
-
-        const queued = queuedDirectionRef.current;
-        queuedDirectionRef.current = null;
-        if (queued && queued !== nextDirection) animateTo(queued);
+        setTurnFrames(null);
       });
     },
     [clearTransitionTimers],
@@ -302,15 +248,21 @@ function CursorPortrait({ onToggleTheme }: { onToggleTheme: () => void }) {
     const deltaY = clientY - (rect.top + rect.height / 2);
     const distance = Math.hypot(deltaX, deltaY);
 
-    if (allowCenter && distance < rect.width / 2) return "center";
+    if (allowCenter && distance < Math.max(rect.width / 2, 60)) return "center";
 
     const angle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
-    const index = Math.round(((((angle + 90) % 360) + 360) % 360) / 30) % portraitOrbit.length;
-    return portraitOrbit[index];
+    if (angle >= -22.5 && angle < 22.5) return "right";
+    if (angle >= 22.5 && angle < 67.5) return "down-right";
+    if (angle >= 67.5 && angle < 112.5) return "down";
+    if (angle >= 112.5 && angle < 157.5) return "down-left";
+    if (angle >= 157.5 || angle < -157.5) return "left";
+    if (angle >= -157.5 && angle < -112.5) return "up-left";
+    if (angle >= -112.5 && angle < -67.5) return "up";
+    return "up-right";
   }, []);
 
   useEffect(() => {
-    preloadImage("/profile/portrait-directions.webp");
+    preloadImage(portraitSheetSrc);
     portraitTransitionSources.forEach(preloadImage);
 
     let animationFrame = 0;
@@ -380,25 +332,11 @@ function CursorPortrait({ onToggleTheme }: { onToggleTheme: () => void }) {
           onToggleTheme();
         }}
       >
-        {transition?.kind === "photo" ? (
-          <span className="portrait-layer">
-            <PortraitTransitionCell route={transition.route} column={transition.column} />
-          </span>
-        ) : (
-          <>
-            <span
-              className="portrait-layer"
-              style={{ opacity: transition?.kind === "blend" ? 1 - transition.alpha : 1 }}
-            >
-              <PortraitCell direction={transition?.kind === "blend" ? transition.from : currentDirection} />
-            </span>
-            {transition?.kind === "blend" ? (
-              <span className="portrait-layer" style={{ opacity: transition.alpha }}>
-                <PortraitCell direction={transition.to} />
-              </span>
-            ) : null}
-          </>
-        )}
+        <span className="portrait-layer">
+          <PortraitFrameView
+            frame={turnFrames ? turnFrames[Math.min(turnStep, turnFrames.length - 1)] : portraitCellOf(currentDirection)}
+          />
+        </span>
       </button>
       <span className="touch-hint" aria-hidden="true">drag my portrait</span>
     </div>
@@ -838,12 +776,10 @@ function PortfolioPage({
       </nav>
 
       <header id="home" className="hero">
-        <div className="profile-row">
+        <div className="profile-center">
           <CursorPortrait onToggleTheme={onToggleTheme} />
-          <div className="profile-copy">
-            <h1>Suhassai Masetty</h1>
-            <p className="role">AI-assisted builder and digital marketer</p>
-          </div>
+          <h1>Suhassai Masetty</h1>
+          <p className="role">AI-assisted builder and digital marketer</p>
         </div>
         <div className="hero-copy">
           <p>I build websites, content experiments, and digital systems that turn rough ideas into useful, polished experiences.</p>
