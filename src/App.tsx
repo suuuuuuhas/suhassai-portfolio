@@ -1,9 +1,12 @@
 import {
   ArrowUpRight,
+  GithubLogo,
   Globe,
   InstagramLogo,
+  List,
   LinkedinLogo,
   Moon,
+  SquaresFour,
   Sun,
   WhatsappLogo,
 } from "@phosphor-icons/react";
@@ -13,6 +16,7 @@ import {
   digitalProjects,
   educationItems,
   experienceItems,
+  githubProjects,
   identity,
   links,
   proofSignals,
@@ -35,6 +39,8 @@ type PortraitDirection =
   | "left"
   | "left-up-soft"
   | "up-left";
+
+const greetings = ["hello", "namaste", "hola", "bonjour", "ciao", "こんにちは", "హలో"];
 
 const sectionTitles: Record<SectionId, string> = {
   about: "About",
@@ -679,6 +685,31 @@ function HelpView({ onBack }: { onBack: () => void }) {
   );
 }
 
+function RotatingGreeting() {
+  const reduceMotion = useReducedMotion();
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const timer = window.setInterval(() => setIndex((current) => (current + 1) % greetings.length), 1800);
+    return () => window.clearInterval(timer);
+  }, [reduceMotion]);
+
+  return (
+    <p className="greeting" aria-live="polite">
+      <motion.span
+        key={greetings[index]}
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
+      >
+        {greetings[index]}
+      </motion.span>
+      <span>, I’m</span>
+    </p>
+  );
+}
+
 function PortfolioPage({
   theme,
   onToggleTheme,
@@ -689,7 +720,9 @@ function PortfolioPage({
   onOpenHelp: () => void;
 }) {
   const reduceMotion = useReducedMotion();
-  const [openSection, setOpenSection] = useState<SectionId | null>(null);
+  const [projectView, setProjectView] = useState<"list" | "showcase">("list");
+  const [projectSource, setProjectSource] = useState<"github" | "client">("github");
+  const shownProjects = projectSource === "github" ? githubProjects : digitalProjects;
 
   return (
     <motion.div
@@ -700,57 +733,161 @@ function PortfolioPage({
       transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeOut" }}
     >
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <header className="hero">
-        <div className="header-top">
+      <nav className="site-nav" aria-label="Primary navigation">
+        <a href="#home">home</a>
+        <a href="#projects">work</a>
+        <a href="#crafts">extras</a>
+        <a href="#contact">contact</a>
+        <button type="button" className="theme-toggle" aria-label="Toggle theme" onClick={onToggleTheme}>
+          {theme === "dark" ? <Sun size={16} weight="bold" /> : <Moon size={16} weight="bold" />}
+        </button>
+      </nav>
+
+      <header id="home" className="hero">
+        <div className="profile-center">
           <CursorPortrait onToggleTheme={onToggleTheme} />
-          <button type="button" className="theme-toggle" aria-label="Toggle theme" onClick={onToggleTheme}>
-            {theme === "dark" ? <Sun size={17} weight="bold" /> : <Moon size={17} weight="bold" />}
+          <RotatingGreeting />
+          <h1>Suhassai Masetty</h1>
+          <p className="role">AI-assisted builder and digital marketer</p>
+        </div>
+        <p className="tagline">
+          I build websites, content experiments, and digital systems for ideas that deserve attention. Currently shaping the web presence of{" "}
+          <a href={links.masettyAgro} target="_blank" rel="noreferrer">Masetty Agro Products</a>.
+        </p>
+        <div className="hero-actions">
+          <a className="primary-action" href={links.whatsapp} target="_blank" rel="noreferrer">Say hello <ArrowUpRight size={15} weight="bold" /></a>
+          <button
+            type="button"
+            className="quiet-action"
+            onMouseEnter={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
+            onFocus={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
+            onClick={() => {
+              helpTopics.forEach((topic) => preloadImage(topic.sprite));
+              window.scrollTo({ top: 0, behavior: "auto" });
+              onOpenHelp();
+            }}
+          >
+            How can I help?
           </button>
         </div>
-        <h1>Suhassai Masetty</h1>
-        <p className="tagline">
-          JEE 2026 aspirant and Head of Digital Marketing at{" "}
-          <a href={links.masettyAgro} target="_blank" rel="noreferrer">Masetty Agro Products</a>.
-          I code with AI, stay relentlessly curious, and study why ideas travel online.
-        </p>
       </header>
 
       <main id="main-content">
-        <AccordionSection id="about" open={openSection === "about"} onToggle={() => setOpenSection((value) => value === "about" ? null : "about")}>
-          <AboutContent />
-        </AccordionSection>
-        <AccordionSection id="experience" open={openSection === "experience"} onToggle={() => setOpenSection((value) => value === "experience" ? null : "experience")}>
+        <section className="proof-strip" aria-label="Current focus">
+          <p>Building with AI</p>
+          <p>Digital at Masetty Agro</p>
+          <p>Studying why ideas travel</p>
+        </section>
+
+        <section id="projects" className="portfolio-section">
+          <div className="section-heading">
+            <h2>projects.</h2>
+            <div className="project-controls">
+              <label className="source-select">
+                <span className="sr-only">Project source</span>
+                <select value={projectSource} onChange={(event) => setProjectSource(event.target.value as "github" | "client")}>
+                  <option value="github">GitHub builds</option>
+                  <option value="client">Client and content</option>
+                </select>
+              </label>
+              <div className="view-switcher" role="group" aria-label="Project view">
+                <button type="button" aria-pressed={projectView === "list"} onClick={() => setProjectView("list")}>
+                  <List size={17} weight="bold" aria-hidden="true" />
+                  <span className="sr-only">List view</span>
+                </button>
+                <button type="button" aria-pressed={projectView === "showcase"} onClick={() => setProjectView("showcase")}>
+                  <SquaresFour size={17} weight="bold" aria-hidden="true" />
+                  <span className="sr-only">Showcase view</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {projectView === "list" ? (
+            <div className="project-records">
+              {shownProjects.map((project) => {
+                const isPrivate = "isPrivate" in project && project.isPrivate;
+                return (
+                  <article key={project.title} className="project-record">
+                    <span>
+                      <strong>{project.title}</strong>
+                      <small>{project.label} - {project.description}</small>
+                    </span>
+                    {isPrivate ? (
+                      <span className="repo-visibility">Private repo</span>
+                    ) : (
+                      <a className="project-link" href={project.url} target="_blank" rel="noreferrer" aria-label={`Open ${project.title}`}>
+                        <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
+                      </a>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          ) : projectSource === "github" ? (
+            <div className="github-showcase">
+              {githubProjects.map((project) => (
+                <article key={project.title} className="github-card">
+                  <span>GitHub build</span>
+                  <strong>{project.title}</strong>
+                  <p>{project.description}</p>
+                  <small>Private repository</small>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="project-showcase">
+              {workItems.slice(0, 4).map((item) => (
+                <article key={item.title} className="showcase-card">
+                  <img src={item.image} alt="" />
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.description}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section id="crafts" className="portfolio-section">
+          <div className="section-heading"><h2>creative archive.</h2></div>
+          <div className="archive-grid">
+            {workItems.map((item) => (
+              <article key={item.title} className="archive-item">
+                <img src={item.image} alt="" />
+                <div>
+                  <span>{item.category}</span>
+                  <strong>{item.title}</strong>
+                  <small>{item.year}</small>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="portfolio-section">
+          <div className="section-heading"><h2>experience.</h2></div>
           <ExperienceContent />
-        </AccordionSection>
-        <AccordionSection id="work" open={openSection === "work"} onToggle={() => setOpenSection((value) => value === "work" ? null : "work")}>
-          <WorkContent />
-        </AccordionSection>
-        <AccordionSection id="education" open={openSection === "education"} onToggle={() => setOpenSection((value) => value === "education" ? null : "education")}>
+        </section>
+
+        <section className="portfolio-section">
+          <div className="section-heading"><h2>education.</h2></div>
           <EducationContent />
-        </AccordionSection>
-        <AccordionSection id="links" open={openSection === "links"} onToggle={() => setOpenSection((value) => value === "links" ? null : "links")}>
+        </section>
+
+        <section id="contact" className="portfolio-section contact-section">
+          <div className="section-heading"><h2>socials.</h2></div>
           <LinksContent />
-        </AccordionSection>
+        </section>
       </main>
 
-      <button
-        type="button"
-        className="help-trigger"
-        onMouseEnter={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
-        onFocus={() => helpTopics.forEach((topic) => preloadImage(topic.sprite))}
-        onClick={() => {
-          helpTopics.forEach((topic) => preloadImage(topic.sprite));
-          window.scrollTo({ top: 0, behavior: "auto" });
-          onOpenHelp();
-        }}
-      >
-        How can I help?
-      </button>
-
       <footer>
-        <a href={links.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>
-        <a href={links.instagram} target="_blank" rel="noreferrer">Instagram</a>
-        <a href={links.whatsapp} target="_blank" rel="noreferrer">WhatsApp</a>
+        <span>© 2026 Suhassai Masetty</span>
+        <a href={links.linkedin} target="_blank" rel="noreferrer"><LinkedinLogo size={16} weight="bold" aria-label="LinkedIn" /></a>
+        <a href={links.instagram} target="_blank" rel="noreferrer"><InstagramLogo size={16} weight="bold" aria-label="Instagram" /></a>
+        <a href={links.whatsapp} target="_blank" rel="noreferrer"><WhatsappLogo size={16} weight="bold" aria-label="WhatsApp" /></a>
+        <a href="https://github.com/suuuuuuhas" target="_blank" rel="noreferrer"><GithubLogo size={16} weight="bold" aria-label="GitHub" /></a>
       </footer>
     </motion.div>
   );

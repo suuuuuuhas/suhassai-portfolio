@@ -94,6 +94,44 @@ export const digitalProjects = [
   },
 ];
 
+export const githubProjects = [
+  {
+    title: "Ridge Runner",
+    label: "Playable original game",
+    url: "https://github.com/suuuuuuhas/ridge-runner",
+    description: "A playable original hill-racing game built with Codex.",
+    isPrivate: true,
+  },
+  {
+    title: "Barricade Lab",
+    label: "Research toolkit",
+    url: "https://github.com/suuuuuuhas/barricade-lab",
+    description: "An authorization-bounded Barricade research and replay analysis toolkit.",
+    isPrivate: true,
+  },
+  {
+    title: "Wardrobe",
+    label: "AI product",
+    url: "https://github.com/suuuuuuhas/wardrobe",
+    description: "A local-first AI wardrobe and outfit manager.",
+    isPrivate: true,
+  },
+  {
+    title: "30-Day Forge",
+    label: "Progress app",
+    url: "https://github.com/suuuuuuhas/30-day-forge",
+    description: "An evidence-first 30-day progress and goal tracking app.",
+    isPrivate: true,
+  },
+  {
+    title: "Suhassai Portfolio",
+    label: "This website",
+    url: "https://github.com/suuuuuuhas/suhassai-portfolio",
+    description: "An interactive React portfolio with cursor-reactive portrait moments.",
+    isPrivate: true,
+  },
+];
+
 export const profileHighlights = [
   "Passionate about problem-solving, analytical thinking, AI, and digital creativity",
   "Good with short-form video editing and currently learning long-form video editing",
